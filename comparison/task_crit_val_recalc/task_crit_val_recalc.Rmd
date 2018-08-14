@@ -1,0 +1,86 @@
+---
+output: github_document
+---
+# Recalculation of Task 2016's Critical Values
+
+```{r setup, include = FALSE, message = FALSE, warning = FALSE}
+library(knitr)
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE,
+                      root.dir = "/wilcoxon")
+```
+
+This document will update the critical value table given in Task 2016 to address the error found in their critical value computation. This table is sourced from all of the comparative analyses.
+
+#### Setup
+
+```{r packages}
+library(rmutil)
+library(tidyverse)
+library(xtable)
+```
+
+#### The Old Table
+
+```{r task_crit_val_table, echo = FALSE, results = 'asis'}
+task_crit_val_table <- data_frame(NR_min = c(10, 20, 30, 40, 50, 
+                                             100, 200, 300, 400, 500, 1000),
+           "0.0595" = c(2.415, 2.165, 2.075, 2.015, 1.975, 
+                        1.885, 1.815, 1.785, 1.765, 1.755, 1.725),
+           "0.03475" = c(2.73, 2.48, 2.39, 2.33, 2.29, 2.2, 
+                         2.13, 2.1, 2.08, 2.07, 2.04),
+           "0.0199" = c(3.096, 2.846, 2.756, 2.696, 2.656, 2.566, 
+                        2.496, 2.466, 2.446, 2.436, 2.406),
+           "0.01495" = c(3.346, 3.096, 3.006, 2.946, 2.906, 2.816, 
+                         2.746, 2.716, 2.696, 2.686, 2.656))
+
+task_crit_val_table %>% kable()
+```
+
+#### Calculations
+
+We use the same sample sizes as in the previous power, and recalculate noise bounds.
+
+```{r recalc}
+sizes <- c(10, 20, 30, 40, 50, 100, 200, 300, 400, 500, 1000)
+
+new_noise_bounds <- map(sizes, 
+    .f = function(n) {2*n/sqrt(n*(n+1)*(2*n+1)/6)}
+    ) %>%
+    map(.,
+        qlaplace,
+        p = .99,
+        m = 0) %>%
+    unlist()
+     
+new_noise_bounds
+```
+
+We now add these bounds to each value of a critical value table generated using the normal approximation.
+
+```{r table}
+z_norms <- qnorm(p = c(.95, .975, .99, .995))
+
+new_task_crit_val_table <-map2(.x = rep(new_noise_bounds, 
+                                        times = length(z_norms)),
+                               .y = rep(z_norms, each = length(new_noise_bounds)),
+                               sum) %>%
+                               unlist() %>%
+                               matrix(., 
+                                      nrow = length(new_noise_bounds), 
+                                      ncol = length(z_norms)) %>%
+                               as.data.frame() %>%
+                         cbind(sizes, .)
+
+names(new_task_crit_val_table) <- c("NR_min", "0.0595", ".03475", 
+                                    ".0199", ".01495")
+```
+
+#### The New Table
+
+Task's recalculated critical values are much higher.
+
+```{r new_task_crit_val_table, echo = FALSE, results = 'asis'}
+new_task_crit_val_table %>% kable()
+```
+
